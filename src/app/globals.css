@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-prime-black: #1a1a1a;
+  --color-prime-gold: #c9a961;
+  --color-prime-red: #b33a3a;
+  --color-prime-gray: #f5f5f5;
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-prime-black);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
