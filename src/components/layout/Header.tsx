@@ -20,11 +20,14 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="shrink-0 text-lg font-semibold tracking-tight sm:text-xl"
-          style={{ color: "var(--color-prime-gold)" }}
+          className="flex shrink-0 items-center gap-2"
           onClick={() => setMenuOpen(false)}
         >
-          Prime Property
+          <img
+            src="/images/logo/logo-horizontal.svg"
+            alt="Prime Property"
+            className="h-8 w-auto"
+          />
         </Link>
 
         <nav
@@ -44,7 +47,7 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <Link
-            href="/login"
+            href="/agent/login"
             className="hidden rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--color-prime-gold)]/10 sm:inline-block"
             style={{
               borderColor: "var(--color-prime-gold)",
@@ -120,7 +123,7 @@ export default function Header() {
             ))}
             <li className="pt-2">
               <Link
-                href="/login"
+                href="/agent/login"
                 className="block rounded-md border px-4 py-3 text-center text-base font-medium transition-colors hover:bg-[var(--color-prime-gold)]/10"
                 style={{
                   borderColor: "var(--color-prime-gold)",

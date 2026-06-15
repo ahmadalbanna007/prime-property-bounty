@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Square badge -->
+  <rect width="40" height="40" rx="8" fill="#1A1A1A"/>
+  
+  <!-- Gold house icon -->
+  <path d="M9 24L20 15L31 24" stroke="#C9A961" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="9" y="24" width="22" height="12" rx="2" fill="#C9A961" opacity="0.15"/>
+  <rect x="16" y="28" width="8" height="8" rx="1.5" fill="#C9A961"/>
+  
+  <!-- Gold accent bar -->
+  <rect x="8" y="6" width="24" height="3" rx="1.5" fill="#C9A961"/>
+</svg>
