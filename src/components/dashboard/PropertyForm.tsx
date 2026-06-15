@@ -70,12 +70,29 @@ export default function PropertyForm({ property, onCancel }: PropertyFormProps) 
     
     if (!formData.nama_property || formData.nama_property.length < 3) {
       newErrors.nama_property = 'Nama properti minimal 3 karakter';
+    } else if (formData.nama_property.length > 100) {
+      newErrors.nama_property = 'Nama properti maksimal 100 karakter';
     }
-    if (formData.lebar <= 0) newErrors.lebar = 'Lebar harus lebih dari 0';
-    if (formData.panjang <= 0) newErrors.panjang = 'Panjang harus lebih dari 0';
+    if (formData.lebar <= 0) newErrors.lebar = 'Lebar wajib diisi dan harus lebih dari 0';
+    if (formData.panjang <= 0) newErrors.panjang = 'Panjang wajib diisi dan harus lebih dari 0';
     if (formData.hadap.length === 0) newErrors.hadap = 'Pilih minimal 1 arah hadap';
-    if (formData.price < 0) newErrors.price = 'Harga tidak boleh negatif';
+    if (formData.price <= 0) newErrors.price = 'Harga wajib diisi dan harus lebih dari 0';
+    else if (!Number.isInteger(Number(formData.price))) newErrors.price = 'Harga harus berupa bilangan bulat';
     if (formData.kawasan.length === 0) newErrors.kawasan = 'Pilih minimal 1 kawasan';
+    if (!formData.maps_link || formData.maps_link.trim() === '') {
+      newErrors.maps_link = 'Link Google Maps wajib diisi';
+    } else if (!formData.maps_link.includes('google.com/maps')) {
+      newErrors.maps_link = 'Link Google Maps harus mengandung google.com/maps';
+    }
+    if (!formData.tingkat || formData.tingkat < 1) {
+      newErrors.tingkat = 'Tingkat wajib diisi dan minimal 1';
+    } else {
+      const tingkatStr = String(formData.tingkat);
+      const decimalParts = tingkatStr.split('.');
+      if (decimalParts.length > 1 && decimalParts[1].length > 1) {
+        newErrors.tingkat = 'Tingkat maksimal 1 angka desimal';
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -96,6 +113,7 @@ export default function PropertyForm({ property, onCancel }: PropertyFormProps) 
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
+        credentials: 'include',
       });
 
       const result = await res.json();
@@ -191,6 +209,7 @@ export default function PropertyForm({ property, onCancel }: PropertyFormProps) 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tingkat *</label>
             <input name="tingkat" type="number" value={formData.tingkat} onChange={handleChange} className={inputClass('tingkat')} min="1" max="10" />
+            {errors.tingkat && <p className="mt-1 text-xs text-[var(--color-prime-red)]">{errors.tingkat}</p>}
           </div>
         </div>
 
@@ -224,8 +243,9 @@ export default function PropertyForm({ property, onCancel }: PropertyFormProps) 
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Link Google Maps</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Link Google Maps *</label>
           <input name="maps_link" type="url" value={formData.maps_link} onChange={handleChange} className={inputClass('maps_link')} placeholder="https://google.com/maps/..." />
+          {errors.maps_link && <p className="mt-1 text-xs text-[var(--color-prime-red)]">{errors.maps_link}</p>}
         </div>
 
         <div>

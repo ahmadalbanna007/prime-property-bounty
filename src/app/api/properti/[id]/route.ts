@@ -3,7 +3,6 @@ import { createApiClient } from '@/utils/supabase/server';
 import { requireSuperadmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-
 type RouteParams = {
   params: Promise<{ id: string }>;
 };
@@ -38,11 +37,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = createApiClient();
+    const user = await requireSuperadmin();
 
-    // Hanya Superadmin yang boleh mengupdate properti
-    await requireSuperadmin();
-
-    // Get existing data
     const { data: existing } = await supabase
       .from('properties')
       .select('*')
@@ -72,6 +68,15 @@ export async function PUT(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Log audit
+    await supabase.from('audit_logs').insert({
+      property_id: id,
+      action: 'UPDATE',
+      changed_by: user.id,
+      old_data: existing,
+      new_data: data,
+    });
+
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
@@ -83,11 +88,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = createApiClient();
+    const user = await requireSuperadmin();
 
-    // Hanya Superadmin yang boleh menghapus properti
-    await requireSuperadmin();
-
-    // Get existing data
     const { data: existing } = await supabase
       .from('properties')
       .select('*')
@@ -101,7 +103,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Soft delete
     const { error } = await supabase
       .from('properties')
       .update({ deleted_at: new Date().toISOString() })
@@ -113,6 +114,15 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         { status: 500 }
       );
     }
+
+    // Log audit
+    await supabase.from('audit_logs').insert({
+      property_id: id,
+      action: 'DELETE',
+      changed_by: user.id,
+      old_data: existing,
+      new_data: null,
+    });
 
     return NextResponse.json({ message: 'Properti berhasil dihapus.' });
   } catch (err) {

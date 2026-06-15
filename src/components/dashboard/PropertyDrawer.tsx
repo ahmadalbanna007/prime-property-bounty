@@ -23,6 +23,7 @@ export default function PropertyDrawer({
   const overlayRef = useRef<HTMLDivElement>(null);
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -60,15 +61,18 @@ export default function PropertyDrawer({
 
   const handleDelete = async () => {
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/properti/${property.id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
-      if (!res.ok) throw new Error('Gagal menghapus properti');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal menghapus properti');
       onDeleted?.(property.id);
       onClose();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menghapus');
+      setDeleteError(err instanceof Error ? err.message : 'Gagal menghapus');
     } finally {
       setDeleting(false);
       setShowConfirm(false);
@@ -128,6 +132,11 @@ export default function PropertyDrawer({
         </div>
 
         {/* Delete Confirmation Modal */}
+        {deleteError && (
+          <div className="bg-red-50 p-4 border-b border-red-100">
+            <p className="text-xs text-[var(--color-prime-red)]">{deleteError}</p>
+          </div>
+        )}
         {showConfirm && (
           <div className="border-b border-red-100 bg-red-50 px-6 py-4">
             <p className="text-sm font-medium text-[var(--color-prime-red)]">

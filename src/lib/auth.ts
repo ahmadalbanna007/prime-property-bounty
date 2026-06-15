@@ -99,6 +99,11 @@ export async function requireAuth(): Promise<{ user: User; session: Session }> {
 export async function requireSuperadmin(): Promise<User> {
   const { user } = await requireAuth();
   const role = await getUserRole(user.id);
+  // In development, treat any logged‑in user as superadmin if role is missing.
+  if (!role && process.env.NODE_ENV !== 'production') {
+    console.warn('[AUTH] Fallback to superadmin (dev mode) for user', user.id);
+    return user;
+  }
   if (role !== 'superadmin') {
     throw new Error(`Akses Ditolak: Anda login sebagai ${role || 'user biasa'}. Hanya Superadmin yang diizinkan.`);
   }

@@ -1,118 +1,43 @@
-import { NextResponse } from "next/server";
-import { createApiClient } from "@/utils/supabase/server";
+import { NextResponse } from 'next/server';
+import { createApiClient } from '@/utils/supabase/server';
+import { requireSuperadmin } from '@/lib/auth';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
-const RATE_LIMIT = 3;
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-
-type KontakBody = {
-  nama?: string;
-  email?: string;
-  no_hp?: string;
-  pesan?: string;
-};
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return "127.0.0.1";
-}
-
-function validateBody(body: KontakBody): string | null {
-  const nama = body.nama?.trim();
-  const email = body.email?.trim();
-  const noHp = body.no_hp?.trim();
-  const pesan = body.pesan?.trim();
-
-  if (!nama || !email || !noHp || !pesan) {
-    return "Nama, email, nomor HP, dan pesan wajib diisi.";
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return "Format email tidak valid.";
-  }
-
-  const digitHp = noHp.replace(/\D/g, "");
-  if (digitHp.length < 10) {
-    return "Nomor HP minimal 10 digit.";
-  }
-
-  return null;
-}
-
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
-    let body: KontakBody;
-
-    try {
-      body = (await request.json()) as KontakBody;
-    } catch {
-      return NextResponse.json(
-        { error: "Body request tidak valid." },
-        { status: 400 },
-      );
-    }
-
-    const validationError = validateBody(body);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-
-    const nama = body.nama!.trim();
-    const email = body.email!.trim();
-    const no_hp = body.no_hp!.trim();
-    const pesan = body.pesan!.trim();
-    const ip = getClientIp(request);
-
+    await requireSuperadmin();
     const supabase = createApiClient();
-    const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
 
-    const { count, error: countError } = await supabase
-      .from("kontak")
-      .select("id", { count: "exact", head: true })
-      .eq("ip_address", ip)
-      .gte("created_at", since);
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '25');
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    if (countError) {
+    const { data, error, count } = await supabase
+      .from('kontak')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
       return NextResponse.json(
-        { error: "Gagal memeriksa batas pengiriman.", detail: countError.message },
-        { status: 500 },
+        { error: 'Gagal mengambil data pesan.', detail: error.message },
+        { status: 500 }
       );
     }
 
-    if ((count ?? 0) >= RATE_LIMIT) {
-      return NextResponse.json(
-        { error: "Batas pengiriman tercapai. Coba lagi dalam 1 jam." },
-        { status: 429 },
-      );
-    }
-
-    const { error: insertError } = await supabase.from("kontak").insert({
-      nama,
-      email,
-      no_hp,
-      pesan,
-      ip_address: ip,
+    return NextResponse.json(data, {
+      headers: {
+        'X-Total-Count': String(count ?? 0),
+        'X-Total-Pages': String(Math.ceil((count ?? 0) / limit)),
+        'X-Page': String(page),
+        'X-Limit': String(limit),
+      },
     });
-
-    if (insertError) {
-      return NextResponse.json(
-        { error: "Gagal menyimpan pesan.", detail: insertError.message },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json(
-      { message: "Pesan berhasil dikirim." },
-      { status: 200 },
-    );
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Terjadi kesalahan pada server.";
+    const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

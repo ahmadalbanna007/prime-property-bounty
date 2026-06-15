@@ -19,16 +19,14 @@ const propertyFilterSchema = z.object({
   sort: z.enum(['nama', 'price', 'created_at', 'status']).optional(),
   order: z.enum(['asc', 'desc']).optional(),
   page: z.number().int().positive().optional(),
-  limit: z.enum(['25', '50', '100']).optional(),
+  limit: z.enum(['6', '25', '50', '100']).optional(),
 });
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    
     const raw = {
-      search: searchParams.get('search'),
-      kawasan: searchParams.getAll('kawasan'),
+      search: searchParams.get('search'),        kawasan: searchParams.getAll('kawasan'),
       hadap: searchParams.getAll('hadap'),
       tipe: searchParams.get('tipe'),
       status: searchParams.get('status'),
@@ -42,106 +40,44 @@ export async function GET(request: Request) {
       limit: searchParams.get('limit'),
     };
 
-    // Convert null to undefined (Zod .optional() expects undefined, not null)
     const params = Object.fromEntries(
       Object.entries(raw).map(([k, v]) => [k, v === null ? undefined : v])
     ) as Record<string, unknown>;
 
-    // Type-safe transforms
     if (typeof params.carport === 'string') {
       params.carport = params.carport === 'true' ? true : params.carport === 'false' ? false : undefined;
     }
-    if (typeof params.lebar_min === 'string') {
-      params.lebar_min = parseFloat(params.lebar_min) || undefined;
-    }
-    if (typeof params.harga_max === 'string') {
-      params.harga_max = parseFloat(params.harga_max) || undefined;
-    }
-    if (typeof params.page === 'string') {
-      params.page = parseInt(params.page) || undefined;
-    }
+    if (typeof params.lebar_min === 'string') params.lebar_min = parseFloat(params.lebar_min as string) || undefined;
+    if (typeof params.harga_max === 'string') params.harga_max = parseFloat(params.harga_max as string) || undefined;
+    if (typeof params.page === 'string') params.page = parseInt(params.page as string) || undefined;
 
     const validated = propertyFilterSchema.parse(params);
-
     const supabase = createApiClient();
+    let query = supabase.from('properties').select('*', { count: 'exact' }).is('deleted_at', null);
 
-    let query = supabase
-      .from('properties')
-      .select('*', { count: 'exact' })
-      .is('deleted_at', null);
-
-    // Filter by search
     if (validated.search) {
       const searchTerm = `%${validated.search}%`;
-      query = query.or(`
-        nama_property.ilike.${searchTerm},
-        group_name.ilike.${searchTerm},
-        kawasan.ilike.${searchTerm}
-      `);
+      query = query.or(`nama_property.ilike.${searchTerm},group_name.ilike.${searchTerm},kawasan.ilike.${searchTerm}`);
     }
+    if (validated.kawasan && validated.kawasan.length > 0) query = query.contains('kawasan', validated.kawasan);
+    if (validated.hadap && validated.hadap.length > 0) query = query.contains('hadap', validated.hadap);
+    if (validated.tipe) query = query.eq('tipe', validated.tipe);
+    if (validated.status) query = query.eq('status', validated.status);
+    if (validated.siap && validated.siap.length > 0) query = query.in('siap', validated.siap);
+    if (validated.carport !== undefined) query = query.eq('carport', validated.carport);
+    if (validated.lebar_min) query = query.gte('lebar', validated.lebar_min);
+    if (validated.harga_max) query = query.lte('price', validated.harga_max);
 
-    // Filter by kawasan
-    if (validated.kawasan && validated.kawasan.length > 0) {
-      query = query.contains('kawasan', validated.kawasan);
-    }
+    const sortField = validated.sort === 'nama' ? 'nama_property' : (validated.sort || 'created_at');
+    query = query.order(sortField, { ascending: validated.order === 'asc' });
 
-    // Filter by hadap
-    if (validated.hadap && validated.hadap.length > 0) {
-      query = query.contains('hadap', validated.hadap);
-    }
-
-    // Filter by tipe
-    if (validated.tipe) {
-      query = query.eq('tipe', validated.tipe);
-    }
-
-    // Filter by status
-    if (validated.status) {
-      query = query.eq('status', validated.status);
-    }
-
-    // Filter by siap
-    if (validated.siap && validated.siap.length > 0) {
-      query = query.in('siap', validated.siap);
-    }
-
-    // Filter by carport
-    if (validated.carport !== undefined) {
-      query = query.eq('carport', validated.carport);
-    }
-
-    // Filter by lebar_min
-    if (validated.lebar_min) {
-      query = query.gte('lebar', validated.lebar_min);
-    }
-
-    // Filter by harga_max
-    if (validated.harga_max) {
-      query = query.lte('price', validated.harga_max);
-    }
-
-    // Sorting
-    const sortField = validated.sort === 'nama' ? 'nama_property' : validated.sort;
-    if (sortField) {
-      query = query.order(sortField, { ascending: validated.order === 'asc' });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    // Pagination
     const page = validated.page ?? 1;
     const limit = validated.limit ? parseInt(validated.limit) : 50;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
     const { data, error, count } = await query.range(from, to);
-
-    if (error) {
-      return NextResponse.json(
-        { error: 'Gagal mengambil data properti.', detail: error.message },
-        { status: 500 }
-      );
-    }
+    if (error) return NextResponse.json({ error: 'Gagal mengambil data properti.', detail: error.message }, { status: 500 });
 
     return NextResponse.json(data, {
       headers: {
@@ -152,12 +88,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid filters.', details: err.issues },
-        { status: 400 }
-      );
-    }
+    if (err instanceof z.ZodError) return NextResponse.json({ error: 'Invalid filters.', details: err.issues }, { status: 400 });
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -166,27 +97,24 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const supabase = createApiClient();
-
-    // Hanya Superadmin yang boleh menambah properti
     const user = await requireSuperadmin();
 
     const body = await request.json();
-
-    // Tambahkan created_by
     body.created_by = user.id;
 
-    const { data, error } = await supabase
-      .from('properties')
-      .insert(body)
-      .select()
-      .single();
-
+    const { data, error } = await supabase.from('properties').insert(body).select().single();
     if (error) {
-      return NextResponse.json(
-        { error: 'Gagal menambahkan properti.', detail: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Gagal menambahkan properti.', detail: error.message }, { status: 500 });
     }
+
+    // Catat ke audit_logs
+    await supabase.from('audit_logs').insert({
+      property_id: data.id,
+      action: 'CREATE',
+      changed_by: user.id,
+      old_data: null,
+      new_data: data,
+    });
 
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
