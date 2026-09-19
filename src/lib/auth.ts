@@ -64,13 +64,12 @@ export async function getUserRole(userId: string): Promise<'admin' | 'superadmin
     console.error("[AUTH] Error querying profiles table:", e);
   }
 
-  // 3. Fallback dev: jika login berhasil, anggap superadmin agar user tidak terblokir
-  if (user?.email) {
-    console.warn(`[AUTH] Fallback superadmin for ${user.email}`);
-    return 'superadmin';
-  }
-
-  return null;
+ // Fallback superadmin HANYA boleh di dev, dan harus eksplisit gated
+if (process.env.NODE_ENV !== 'production' && user?.email) {
+  console.warn(`[AUTH] Fallback superadmin (dev only) for ${user.email}`);
+  return 'superadmin';
+}
+return null; // production: no role = no access
 }
 
 export async function isSuperadmin(userId: string): Promise<boolean> {
